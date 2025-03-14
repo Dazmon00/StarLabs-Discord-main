@@ -1,14 +1,11 @@
 import asyncio
 import random
-
 from loguru import logger
-
-from src.model import prepare_data
+from src.model import prepare_data, Start
 import src.utils
 from src.utils.output import show_dev_info, show_logo, show_menu
 from src.utils.reader import read_csv_accounts
 from src.utils.constants import ACCOUNTS_FILE, Account
-import src.model
 
 
 async def start():
@@ -21,10 +18,10 @@ async def start():
     config = src.utils.get_config()
 
     task = show_menu(src.utils.constants.MAIN_MENU_OPTIONS)
-    if task == "Exit": return
+    if task == "Exit":
+        return
 
     config.DATA_FOR_TASKS = await prepare_data(config, task)
-
     config.TASK = task
 
     # 从CSV文件中读取账户
@@ -34,23 +31,15 @@ async def start():
     start_index = config.SETTINGS.ACCOUNTS_RANGE[0]
     end_index = config.SETTINGS.ACCOUNTS_RANGE[1]
 
-    # 如果都是0，检查EXACT_ACCOUNTS_TO_USE
     if start_index == 0 and end_index == 0:
         if config.SETTINGS.EXACT_ACCOUNTS_TO_USE:
-            # 按具体编号过滤账户
             accounts_to_process = [
-                acc
-                for acc in all_accounts
-                if acc.index in config.SETTINGS.EXACT_ACCOUNTS_TO_USE
+                acc for acc in all_accounts if acc.index in config.SETTINGS.EXACT_ACCOUNTS_TO_USE
             ]
-            logger.info(
-                f"Using specific accounts: {config.SETTINGS.EXACT_ACCOUNTS_TO_USE}"
-            )
+            logger.info(f"Using specific accounts: {config.SETTINGS.EXACT_ACCOUNTS_TO_USE}")
         else:
-            # 如果列表为空，使用所有账户
             accounts_to_process = all_accounts
     else:
-        # 按范围过滤账户
         accounts_to_process = [
             acc for acc in all_accounts if start_index <= acc.index <= end_index
         ]
@@ -81,64 +70,83 @@ async def start():
     )
     logger.info(f"Accounts order: {account_order}")
 
+    # 使用信号量限制并发
     semaphore = asyncio.Semaphore(value=threads)
-    tasks = []
 
-    # 为每个账户创建任务
-    for account in shuffled_accounts:
-        tasks.append(asyncio.create_task(launch_wrapper(account)))
-
-    await asyncio.gather(*tasks)
+    # 并行运行所有账户
+    await asyncio.gather(*(launch_wrapper(account) for account in shuffled_accounts))
 
 
 async def account_flow(account: Account, config: src.utils.config.Config):
-    try:
-        pause = random.randint(
-            config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[0],
-            config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[1],
-        )
-        logger.info(f"[{account.index}] Sleeping for {pause} seconds before start...")
-        await asyncio.sleep(pause)
+    while True:  # 每个账号独立循环
+        try:
+            # 初始随机睡眠
+            pause = random.randint(
+                config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[0],
+                config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[1],
+            )
+            logger.info(f"[{account.index}] Sleeping for <yellow>{pause}</yellow> seconds before start...")
+            await asyncio.sleep(pause)
 
-        instance = src.model.Start(account, config)
+            # 创建实例并执行流程
+            instance = Start(account, config)
 
-        await wrapper(instance.initialize, config)
+            await wrapper(instance.initialize, config)
+            logger.success(f"[{account.index}] Initialized successfully")
 
-        await wrapper(instance.flow, config)
+            await wrapper(instance.flow, config)
+            logger.success(f"[{account.index}] Flow completed successfully")
 
-        pause = random.randint(
-            config.SETTINGS.RANDOM_PAUSE_BETWEEN_ACCOUNTS[0],
-            config.SETTINGS.RANDOM_PAUSE_BETWEEN_ACCOUNTS[1],
-        )
-        logger.info(f"Sleeping for {pause} seconds before next account...")
-        await asyncio.sleep(pause)
+            # 每次循环结束后的随机睡眠（30-60分钟）
+            loop_pause = random.randint(1800, 3600)  # 30 到 60 分钟
+            logger.info(
+                f"[{account.index}] Sleeping for <yellow>{loop_pause // 60}</yellow> minutes "
+                f"(<yellow>{loop_pause}</yellow> seconds) before next loop..."
+            )
+            await asyncio.sleep(loop_pause)
 
-    except Exception as err:
-        logger.error(f"{account.index} | Account flow failed: {err}")
+        except Exception as err:
+            logger.error(f"[{account.index}] | Account flow failed: {err}")
+            # 发生异常时短暂睡眠后重试
+            error_pause = random.randint(60, 300)  # 1 到 5 分钟
+            logger.info(
+                f"[{account.index}] Sleeping for <yellow>{error_pause}</yellow> seconds before retrying..."
+            )
+            await asyncio.sleep(error_pause)
 
 
 async def wrapper(function, config: src.utils.config.Config, *args, **kwargs):
     attempts = config.SETTINGS.ATTEMPTS
     for attempt in range(attempts):
-        result = await function(*args, **kwargs)
-        if isinstance(result, tuple) and result and isinstance(result[0], bool):
-            if result[0]:
-                return result
-        elif isinstance(result, bool):
-            if result:
-                return True
-
-        if attempt < attempts - 1:  # Don't sleep after the last attempt
-            pause = random.randint(
-                config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[0],
-                config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
-            )
-            logger.info(
-                f"Sleeping for {pause} seconds before next attempt {attempt+1}/{config.SETTINGS.ATTEMPTS}..."
-            )
-            await asyncio.sleep(pause)
-
-    return result
+        try:
+            result = await function(*args, **kwargs)
+            if isinstance(result, tuple) and result and isinstance(result[0], bool):
+                if result[0]:
+                    return result
+            elif isinstance(result, bool):
+                if result:
+                    return True
+            if attempt < attempts - 1:  # Don't sleep after the last attempt
+                pause = random.randint(
+                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[0],
+                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
+                )
+                logger.info(
+                    f"Sleeping for <yellow>{pause}</yellow> seconds before next attempt {attempt+1}/{attempts}..."
+                )
+                await asyncio.sleep(pause)
+        except Exception as e:
+            logger.error(f"Wrapper attempt {attempt+1}/{attempts} failed: {e}")
+            if attempt < attempts - 1:
+                pause = random.randint(
+                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[0],
+                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
+                )
+                logger.info(
+                    f"Sleeping for <yellow>{pause}</yellow> seconds before next attempt..."
+                )
+                await asyncio.sleep(pause)
+    return False  # 如果所有尝试都失败，返回 False
 
 
 def task_exists_in_config(task_name: str, tasks_list: list) -> bool:
@@ -151,19 +159,7 @@ def task_exists_in_config(task_name: str, tasks_list: list) -> bool:
             return True
     return False
 
-# 配置带认证的代理
-# 这个参数有时被Discord要求
-# 为代理工作禁用SSL
 
-# 按逗号或空格分割并过滤空字符串
-# 使用固定的图片文件夹路径
-
-# 清屏
-# 创建带有风格化logo的星空
-# 创建渐变文本
-# 添加缩进输出
-# 创建漂亮的表格
-# 添加列
-# 添加联系方式行
-# 带缩进输出表格
-# 输出带编号的选项
+# 主程序入口
+if __name__ == "__main__":
+    asyncio.run(start())
