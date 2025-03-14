@@ -1,0 +1,10 @@
+/venv
+/__pycache__
+/.idea
+/TODO.md
+__pycache__
+/data/success_data
+/data/accounts.csv
+/data/accounts.xlsx
+config.yaml
+.DS_Store
