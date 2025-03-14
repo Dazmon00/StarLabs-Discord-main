@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 定义变量
-SCRIPT_PATH="$HOME/start.sh"
-DISCORD_DIR="$HOME/StarLabs-Discord-main"
+SCRIPT_PATH="$pwd/start.sh"
+DISCORD_DIR="$pwd/StarLabs-Discord-main"
 REPO_URL="https://github.com/Dazmon00/StarLabs-Discord-main.git"
 SCRIPT_URL="https://raw.githubusercontent.com/Dazmon00/StarLabs-Discord-main/main/start.sh"
 OS=$(uname)
@@ -168,8 +168,11 @@ run_discord_tool() {
 
     
     echo "正在启动 StarLabs Discord Bot..."
-    # 使用 exec 替换当前进程运行 main.py
-    exec "$DISCORD_DIR/venv/bin/python3.11" main.py
+    echo "按 Ctrl+C 停止运行并返回主菜单..."
+    python3.11 main.py
+    deactivate
+    echo "Discord Bot 已停止运行。"
+    read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
 # 主菜单
