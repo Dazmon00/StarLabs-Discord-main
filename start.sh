@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 定义变量
-SCRIPT_PATH="$HOME/start.sh"
-DISCORD_DIR="$HOME/StarLabs-Discord-main"
+SCRIPT_PATH="$pwd/start.sh"
+DISCORD_DIR="$pwd/StarLabs-Discord-main"
 REPO_URL="https://github.com/Dazmon00/StarLabs-Discord-main.git"
 SCRIPT_URL="https://raw.githubusercontent.com/Dazmon00/StarLabs-Discord-main/main/start.sh"
 
@@ -98,38 +98,28 @@ install_discord_tool() {
         return 1
     }
 
-    # 创建虚拟环境
-    echo "正在创建虚拟环境..."
-    python3.11 -m venv venv || {
-        echo "创建虚拟环境失败。"
+    # 创建并激活虚拟环境
+    echo "正在创建和激活虚拟环境..."
+    python3.11 -m venv venv
+    source "$DISCORD_DIR/venv/bin/activate" || {
+        echo "无法激活虚拟环境。"
         return 1
     }
 
-    # 激活虚拟环境并安装依赖
-    echo "正在激活虚拟环境并安装依赖..."
-    if ! source "$DISCORD_DIR/venv/bin/activate"; then
-        echo "无法激活虚拟环境。"
-        return 1
-    fi
-
-    if [ ! -f requirements.txt ]; then
+    # 安装依赖
+    echo "正在安装所需的 Python 包..."
+    [ ! -f requirements.txt ] && {
         echo "未找到 requirements.txt 文件，无法安装依赖。"
-        deactivate
         return 1
-    fi
+    }
     pip install -r requirements.txt || {
         echo "安装 requirements.txt 失败。"
-        deactivate
         return 1
     }
     pip install httpx || {
         echo "安装 httpx 失败。"
-        deactivate
         return 1
     }
-
-    # 退出虚拟环境
-    deactivate
 
     echo "安装完成！请配置相关文件后运行脚本。"
     read -n 1 -s -r -p "按任意键返回主菜单..."
@@ -152,37 +142,31 @@ run_discord_tool() {
     # 检查并创建虚拟环境
     if [ ! -d "venv" ]; then
         echo "未找到虚拟环境，正在创建..."
-        python3.11 -m venv venv || {
-            echo "创建虚拟环境失败。"
-            return 1
-        }
-        if ! source venv/bin/activate; then
+        python3.11 -m venv venv
+        source venv/bin/activate || {
             echo "无法激活虚拟环境。"
             return 1
         }
         echo "正在安装依赖..."
-        if ! pip install -r requirements.txt; then
+        pip install -r requirements.txt || {
             echo "安装 requirements.txt 失败。"
-            deactivate
             return 1
-        fi
-        if ! pip install httpx; then
+        }
+        pip install httpx || {
             echo "安装 httpx 失败。"
-            deactivate
             return 1
-        fi
+        }
     else
         echo "正在激活虚拟环境..."
-        if ! source venv/bin/activate; then
+        source venv/bin/activate || {
             echo "无法激活虚拟环境。"
             return 1
-        fi
+        }
     fi
 
     echo "正在启动 StarLabs Discord Bot..."
     python3.11 main.py
     echo "Discord Bot 已停止运行。"
-    deactivate
     read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
