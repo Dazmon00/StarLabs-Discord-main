@@ -158,10 +158,7 @@ run_discord_tool() {
         }
     else
         echo "正在激活虚拟环境..."
-        source venv/bin/activate || {
-            echo "无法激活虚拟环境。"
-            return 1
-        }
+        source venv/bin/activate 
     fi
 
     echo "正在启动 StarLabs Discord Bot..."
