@@ -1,123 +1,137 @@
 import asyncio
 import random
+from typing import List
 from loguru import logger
-from src.model import prepare_data, Start
+from src.model import prepare_data
 import src.utils
 from src.utils.output import show_dev_info, show_logo, show_menu
 from src.utils.reader import read_csv_accounts
 from src.utils.constants import ACCOUNTS_FILE, Account
+import src.model
 
 
 async def start():
+    """程序主入口"""
     show_logo()
     show_dev_info()
     config = src.utils.get_config()
 
     task = show_menu(src.utils.constants.MAIN_MENU_OPTIONS)
-    if task == "Exit":
-        return
+    if task == "Exit": return
 
     config.DATA_FOR_TASKS = await prepare_data(config, task)
     config.TASK = task
 
-    # 从CSV文件中读取账户
-    all_accounts = read_csv_accounts(ACCOUNTS_FILE)
+    # 获取并过滤账户
+    accounts_to_process = await prepare_accounts(config)
+    if not accounts_to_process:
+        return
 
-    # 确定账户范围
+    # 检查代理
+    if not any(account.proxy for account in accounts_to_process):
+        logger.error("No proxies found in accounts data")
+        return
+
+    # 启动账户处理循环
+    await run_account_loops(accounts_to_process, config)
+
+
+async def prepare_accounts(config) -> List[Account]:
+    """准备需要处理的账户列表"""
+    all_accounts = read_csv_accounts(ACCOUNTS_FILE)
     start_index = config.SETTINGS.ACCOUNTS_RANGE[0]
     end_index = config.SETTINGS.ACCOUNTS_RANGE[1]
 
     if start_index == 0 and end_index == 0:
         if config.SETTINGS.EXACT_ACCOUNTS_TO_USE:
-            accounts_to_process = [
-                acc for acc in all_accounts if acc.index in config.SETTINGS.EXACT_ACCOUNTS_TO_USE
+            accounts = [
+                acc for acc in all_accounts
+                if acc.index in config.SETTINGS.EXACT_ACCOUNTS_TO_USE
             ]
             logger.info(f"Using specific accounts: {config.SETTINGS.EXACT_ACCOUNTS_TO_USE}")
         else:
-            accounts_to_process = all_accounts
+            accounts = all_accounts
     else:
-        accounts_to_process = [
-            acc for acc in all_accounts if start_index <= acc.index <= end_index
+        accounts = [
+            acc for acc in all_accounts
+            if start_index <= acc.index <= end_index
         ]
 
-    if not accounts_to_process:
+    if not accounts:
         logger.error("No accounts found in specified range")
-        return
+        return []
 
-    # 检查代理是否存在
-    if not any(account.proxy for account in accounts_to_process):
-        logger.error("No proxies found in accounts data")
-        return
-
-    threads = config.SETTINGS.THREADS
-
-    # 创建账户列表并随机打乱
     if config.SETTINGS.SHUFFLE_ACCOUNTS:
-        shuffled_accounts = list(accounts_to_process)
-        random.shuffle(shuffled_accounts)
-    else:
-        shuffled_accounts = accounts_to_process
+        random.shuffle(accounts)
 
-    # 创建账户顺序字符串
-    account_order = " ".join(str(acc.index) for acc in shuffled_accounts)
-    logger.info(
-        f"Starting with accounts {min(acc.index for acc in accounts_to_process)} "
-        f"to {max(acc.index for acc in accounts_to_process)}..."
-    )
+    account_order = " ".join(str(acc.index) for acc in accounts)
+    logger.info(f"Starting with accounts {min(acc.index for acc in accounts)} "
+                f"to {max(acc.index for acc in accounts)}...")
     logger.info(f"Accounts order: {account_order}")
 
-    # 使用信号量限制并发
-    semaphore = asyncio.Semaphore(value=threads)
+    return accounts
 
-    # 定义并行运行的 wrapper
-    async def launch_wrapper(account):
-        async with semaphore:  # 使用信号量限制并发
-            await account_flow(account, config)
 
-    # 并行启动所有账户的任务
-    tasks = [launch_wrapper(account) for account in shuffled_accounts]
+async def run_account_loops(accounts: List[Account], config):
+    """为每个账户创建独立的循环任务"""
+    semaphore = asyncio.Semaphore(value=config.SETTINGS.THREADS)
+    tasks = [
+        asyncio.create_task(account_loop(account, config, semaphore))
+        for account in accounts
+    ]
     await asyncio.gather(*tasks)
 
 
-async def account_flow(account: Account, config: src.utils.config.Config):
-    while True:  # 每个账号独立循环
+async def account_loop(account: Account, config, semaphore: asyncio.Semaphore):
+    """单个账户的无限循环处理"""
+    while True:
         try:
-            # 初始随机睡眠（短暂，避免所有账号同时启动）
-            pause = random.randint(
-                config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[0],
-                config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[1],
-            )
-            logger.info(f"[{account.index}] Sleeping for <yellow>{pause}</yellow> seconds before start...")
-            await asyncio.sleep(pause)
+            async with semaphore:
+                await account_flow(account, config)
 
-            # 创建实例并执行流程
-            instance = Start(account, config)
-
-            await wrapper(instance.initialize, config)
-            logger.success(f"[{account.index}] Initialized successfully")
-
-            await wrapper(instance.flow, config)
-            logger.success(f"[{account.index}] Flow completed successfully")
-
-            # 每次循环结束后的随机睡眠（30-60分钟）
-            loop_pause = random.randint(1800, 3600)  # 30 到 60 分钟
-            logger.info(
-                f"[{account.index}] Sleeping for <yellow>{loop_pause // 60}</yellow> minutes "
-                f"(<yellow>{loop_pause}</yellow> seconds) before next loop..."
-            )
-            await asyncio.sleep(loop_pause)
+            # 单次执行完成后休眠20-40分钟
+            sleep_minutes = random.uniform(20, 40)
+            sleep_seconds = sleep_minutes * 60
+            logger.info(f"[{account.index}] Completed execution, sleeping for {sleep_minutes:.2f} minutes")
+            await asyncio.sleep(sleep_seconds)
 
         except Exception as err:
-            logger.error(f"[{account.index}] | Account flow failed: {err}")
-            # 发生异常时短暂睡眠后重试
-            error_pause = random.randint(60, 300)  # 1 到 5 分钟
-            logger.info(
-                f"[{account.index}] Sleeping for <yellow>{error_pause}</yellow> seconds before retrying..."
-            )
-            await asyncio.sleep(error_pause)
+            logger.error(f"[{account.index}] Loop error: {err}")
+            # 发生错误时休眠5分钟后重试
+            await asyncio.sleep(300)
 
 
-async def wrapper(function, config: src.utils.config.Config, *args, **kwargs):
+async def account_flow(account: Account, config):
+    """账户处理流程"""
+    try:
+        # 初始随机延迟
+        initial_pause = random.randint(
+            config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[0],
+            config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[1],
+        )
+        logger.info(f"[{account.index}] Sleeping for {initial_pause} seconds before start...")
+        await asyncio.sleep(initial_pause)
+
+        instance = src.model.Start(account, config)
+
+        # 初始化
+        init_result = await wrapper(instance.initialize, config)
+        if not init_result:
+            logger.error(f"[{account.index}] Initialization failed")
+            return
+
+        # 执行主要流程
+        flow_result = await wrapper(instance.flow, config)
+        if not flow_result:
+            logger.warning(f"[{account.index}] Flow execution failed")
+
+    except Exception as err:
+        logger.error(f"[{account.index}] Account flow failed: {err}")
+        raise
+
+
+async def wrapper(function, config, *args, **kwargs):
+    """带重试机制的函数包装器"""
     attempts = config.SETTINGS.ATTEMPTS
     for attempt in range(attempts):
         try:
@@ -128,42 +142,30 @@ async def wrapper(function, config: src.utils.config.Config, *args, **kwargs):
             elif isinstance(result, bool):
                 if result:
                     return True
-            if attempt < attempts - 1:  # Don't sleep after the last attempt
-                pause = random.randint(
-                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[0],
-                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
-                )
-                logger.info(
-                    f"[{function.__self__.account.index}] Sleeping for <yellow>{pause}</yellow> seconds "
-                    f"before next attempt {attempt+1}/{attempts}..."
-                )
-                await asyncio.sleep(pause)
-        except Exception as e:
-            logger.error(f"[{function.__self__.account.index}] Wrapper attempt {attempt+1}/{attempts} failed: {e}")
+
             if attempt < attempts - 1:
                 pause = random.randint(
                     config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[0],
                     config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
                 )
                 logger.info(
-                    f"[{function.__self__.account.index}] Sleeping for <yellow>{pause}</yellow> seconds "
-                    f"before next attempt..."
+                    f"[{attempt + 1}/{attempts}] Sleeping for {pause} seconds before retry..."
                 )
                 await asyncio.sleep(pause)
-    return False  # 如果所有尝试都失败，返回 False
 
+        except Exception as err:
+            if attempt < attempts - 1:
+                pause = random.randint(
+                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[0],
+                    config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
+                )
+                logger.warning(f"Attempt {attempt + 1} failed: {err}, retrying after {pause}s")
+                await asyncio.sleep(pause)
+            else:
+                raise
 
-def task_exists_in_config(task_name: str, tasks_list: list) -> bool:
-    """递归检查任务列表中是否存在指定任务，包括嵌套列表"""
-    for task in tasks_list:
-        if isinstance(task, list):
-            if task_exists_in_config(task_name, task):
-                return True
-        elif task == task_name:
-            return True
     return False
 
 
-# 主程序入口
 if __name__ == "__main__":
     asyncio.run(start())
