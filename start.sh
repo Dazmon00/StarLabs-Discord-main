@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 定义变量
-SCRIPT_PATH="$pwd/start.sh"
-DISCORD_DIR="$pwd/StarLabs-Discord-main"
+SCRIPT_PATH="$HOME/start.sh"
+DISCORD_DIR="$HOME/StarLabs-Discord-main"
 REPO_URL="https://github.com/Dazmon00/StarLabs-Discord-main.git"
 SCRIPT_URL="https://raw.githubusercontent.com/Dazmon00/StarLabs-Discord-main/main/start.sh"
 
@@ -112,11 +112,11 @@ install_discord_tool() {
         return 1
     fi
 
-    [ ! -f requirements.txt ] && {
+    if [ ! -f requirements.txt ]; then
         echo "未找到 requirements.txt 文件，无法安装依赖。"
         deactivate
         return 1
-    }
+    fi
     pip install -r requirements.txt || {
         echo "安装 requirements.txt 失败。"
         deactivate
@@ -161,22 +161,22 @@ run_discord_tool() {
             return 1
         }
         echo "正在安装依赖..."
-        pip install -r requirements.txt || {
+        if ! pip install -r requirements.txt; then
             echo "安装 requirements.txt 失败。"
             deactivate
             return 1
-        }
-        pip install httpx || {
+        fi
+        if ! pip install httpx; then
             echo "安装 httpx 失败。"
             deactivate
             return 1
-        }
+        fi
     else
         echo "正在激活虚拟环境..."
         if ! source venv/bin/activate; then
             echo "无法激活虚拟环境。"
             return 1
-        }
+        fi
     fi
 
     echo "正在启动 StarLabs Discord Bot..."
