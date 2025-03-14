@@ -22,6 +22,8 @@ class Account:
     new_name: str
     new_username: str
     messages_to_send: list[str]
+    excel_guild_id: str
+    excel_channel_id: str
 
 @dataclass
 class DataForTasks:

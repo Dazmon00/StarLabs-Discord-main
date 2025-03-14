@@ -84,6 +84,8 @@ def read_csv_accounts(file_path: str) -> List[Account]:
                 new_name = row.get('NEW_NAME', '').strip()
                 new_username = row.get('NEW_USERNAME', '').strip()
                 messages_txt_name = row.get('MESSAGES_TXT_NAME', '').strip()
+                excel_guild_id = row.get('EXCEL_GUILD_ID', '').strip()
+                excel_channel_id = row.get('EXCEL_CHANNEL_ID', '').strip()
 
                 messages_to_send = []
                 if messages_txt_name.strip():
@@ -102,6 +104,8 @@ def read_csv_accounts(file_path: str) -> List[Account]:
                     new_name=new_name.strip(),
                     new_username=new_username.strip(),
                     messages_to_send=messages_to_send,
+                    excel_guild_id=excel_guild_id,
+                    excel_channel_id=excel_channel_id,
                 )
                 accounts.append(account)
         

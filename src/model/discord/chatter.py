@@ -59,7 +59,9 @@ class DiscordChatter:
                 try:
                     message_sent = False
                     replied_to_me = False
-
+                    logger.info(
+                        self.account
+                    )
                     last_messages = await self._get_last_chat_messages(
                         self.config.AI_CHATTER.GUILD_ID, self.config.AI_CHATTER.CHANNEL_ID
                     )
@@ -265,39 +267,52 @@ class DiscordChatter:
         reply_to_message_id: str = None,
     ) -> tuple[bool, dict]:
         try:
-            headers = {
-                "authorization": self.account.token,
-                "content-type": "application/json",
-                "origin": "https://discord.com",
-                "referer": f"https://discord.com/channels/{guild_id}/{channel_id}",
-                "x-debug-options": "bugReporterEnabled",
-                "x-discord-locale": "en-US",
-                "x-discord-timezone": "Etc/GMT-2",
-                # 'x-super-properties': 'eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiQ2hyb21lIiwiZGV2aWNlIjoiIiwic3lzdGVtX2xvY2FsZSI6InJ1IiwiYnJvd3Nlcl91c2VyX2FnZW50IjoiTW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzEzMi4wLjAuMCBTYWZhcmkvNTM3LjM2IiwiYnJvd3Nlcl92ZXJzaW9uIjoiMTMyLjAuMC4wIiwib3NfdmVyc2lvbiI6IjEwIiwicmVmZXJyZXIiOiJodHRwczovL2Rpc2NvcmQuY29tLyIsInJlZmVycmluZ19kb21haW4iOiJkaXNjb3JkLmNvbSIsInJlZmVycmVyX2N1cnJlbnQiOiIiLCJyZWZlcnJpbmdfZG9tYWluX2N1cnJlbnQiOiIiLCJyZWxlYXNlX2NoYW5uZWwiOiJzdGFibGUiLCJjbGllbnRfYnVpbGRfbnVtYmVyIjozNjY5NTUsImNsaWVudF9ldmVudF9zb3VyY2UiOm51bGwsImhhc19jbGllbnRfbW9kcyI6ZmFsc2V9',
-            }
+            # 使用账号特定的代理创建 AsyncSession
+            proxy = self.account.proxy
+            if proxy and not proxy.startswith(("http://", "https://", "socks5://", "socks5h://")):
+                proxy = f"http://{proxy}"  # 默认添加 HTTP 前缀
 
-            json_data = {
-                "mobile_network_type": "unknown",
-                "content": message,
-                "nonce": calculate_nonce(),
-                "tts": False,
-                "flags": 0,
-            }
-
-            if reply_to_message_id:
-                json_data["message_reference"] = {
-                    "guild_id": guild_id,
-                    "channel_id": channel_id,
-                    "message_id": reply_to_message_id,
+            async with AsyncSession(
+                proxies={"http": proxy, "https": proxy} if proxy else None,
+                impersonate="chrome"
+            ) as client:
+                headers = {
+                    "authorization": self.account.token,
+                    "content-type": "application/json",
+                    "origin": "https://discord.com",
+                    "referer": f"https://discord.com/channels/{guild_id}/{channel_id}",
+                    "x-debug-options": "bugReporterEnabled",
+                    "x-discord-locale": "en-US",
+                    "x-discord-timezone": "Etc/GMT-2",
                 }
 
-            response = await self.client.post(
-                f"https://discord.com/api/v9/channels/{channel_id}/messages",
-                headers=headers,
-                json=json_data,
-            )
+                json_data = {
+                    "mobile_network_type": "unknown",
+                    "content": message,
+                    "nonce": calculate_nonce(),
+                    "tts": False,
+                    "flags": 0,
+                }
 
-            return response.status_code == 200, response.json()
+                if reply_to_message_id:
+                    json_data["message_reference"] = {
+                        "guild_id": guild_id,
+                        "channel_id": channel_id,
+                        "message_id": reply_to_message_id,
+                    }
+
+                logger.info(f"{self.account.index} | Sending message using proxy: {proxy}")
+                response = await client.post(
+                    f"https://discord.com/api/v9/channels/{channel_id}/messages",
+                    headers=headers,
+                    json=json_data,
+                )
+
+                if response.status_code != 200:
+                    logger.error(f"{self.account.index} | Send message failed: {response.status_code} - {response.text}")
+                    return False, {}
+
+                return True, response.json()
 
         except Exception as e:
             logger.error(f"{self.account.index} | Error in send_message: {e}")
@@ -305,74 +320,76 @@ class DiscordChatter:
 
     async def _get_last_chat_messages(
         self, guild_id: str, channel_id: str, quantity: int = 50
-    ) -> list[str]:
+    ) -> list[ReceivedMessage]:
         try:
+            # 使用账号特定的代理创建 AsyncSession
+            proxy = self.account.proxy
+            if proxy and not proxy.startswith(("http://", "https://", "socks5://", "socks5h://")):
+                proxy = f"http://{proxy}"  # 默认添加 HTTP 前缀
 
-            headers = {
-                "authorization": self.account.token,
-                "referer": f"https://discord.com/channels/{guild_id}/{channel_id}",
-                "x-discord-locale": "en-US",
-                "x-discord-timezone": "Etc/GMT-2",
-                # 'x-super-properties': 'eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiQ2hyb21lIiwiZGV2aWNlIjoiIiwic3lzdGVtX2xvY2FsZSI6InJ1IiwiYnJvd3Nlcl91c2VyX2FnZW50IjoiTW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgQ2hyb21lLzEzMi4wLjAuMCBTYWZhcmkvNTM3LjM2IiwiYnJvd3Nlcl92ZXJzaW9uIjoiMTMyLjAuMC4wIiwib3NfdmVyc2lvbiI6IjEwIiwicmVmZXJyZXIiOiJodHRwczovL2Rpc2NvcmQuY29tLyIsInJlZmVycmluZ19kb21haW4iOiJkaXNjb3JkLmNvbSIsInJlZmVycmVyX2N1cnJlbnQiOiIiLCJyZWZlcnJpbmdfZG9tYWluX2N1cnJlbnQiOiIiLCJyZWxlYXNlX2NoYW5uZWwiOiJzdGFibGUiLCJjbGllbnRfYnVpbGRfbnVtYmVyIjozNjY5NTUsImNsaWVudF9ldmVudF9zb3VyY2UiOm51bGwsImhhc19jbGllbnRfbW9kcyI6ZmFsc2V9',
-            }
+            async with AsyncSession(
+                proxies={"http": proxy, "https": proxy} if proxy else None,
+                impersonate="chrome"
+            ) as client:
+                headers = {
+                    "authorization": self.account.token,
+                    "referer": f"https://discord.com/channels/{guild_id}/{channel_id}",
+                    "x-discord-locale": "en-US",
+                    "x-discord-timezone": "Etc/GMT-2",
+                }
 
-            params = {
-                "limit": str(quantity),
-            }
+                params = {
+                    "limit": str(quantity),
+                }
 
-            response = await self.client.get(
-                f"https://discord.com/api/v9/channels/{channel_id}/messages",
-                params=params,
-                headers=headers,
-            )
-
-            if response.status_code != 200:
-                logger.error(
-                    f"Error in _get_last_chat_messages: {response.status_code}"
+                logger.info(f"{self.account.index} | Fetching messages using proxy: {proxy}")
+                response = await client.get(
+                    f"https://discord.com/api/v9/channels/{channel_id}/messages",
+                    params=params,
+                    headers=headers,
                 )
-                return []
 
-            received_messages = []
-            for message in response.json():
-                try:
-                    if (
-                        "you just advanced to level" in message["content"]
-                        or message["content"] == ""
-                    ):
+                if response.status_code != 200:
+                    logger.error(
+                        f"{self.account.index} | Error in _get_last_chat_messages: {response.status_code} - {response.text}"
+                    )
+                    return []
+
+                received_messages = []
+                for message in response.json():
+                    try:
+                        if (
+                            "you just advanced to level" in message["content"]
+                            or message["content"] == ""
+                        ):
+                            continue
+
+                        message_data = ReceivedMessage(
+                            type=message["type"],
+                            content=message["content"],
+                            message_id=message["id"],
+                            channel_id=message["channel_id"],
+                            author_id=message["author"]["id"],
+                            author_username=message["author"]["username"],
+                            referenced_message_content=(
+                                ""
+                                if message.get("referenced_message") in ["None", None]
+                                else message.get("referenced_message", {}).get("content", "")
+                            ),
+                            referenced_message_author_id=(
+                                ""
+                                if message.get("referenced_message") in ["None", None]
+                                else message.get("referenced_message", {}).get("author", {}).get("id", "")
+                            ),
+                        )
+                        received_messages.append(message_data)
+                    except Exception as e:
                         continue
 
-                    message_data = ReceivedMessage(
-                        type=message["type"],
-                        content=message["content"],
-                        message_id=message["id"],
-                        channel_id=message["channel_id"],
-                        author_id=message["author"]["id"],
-                        author_username=message["author"]["username"],
-                        referenced_message_content=(
-                            ""
-                            if message.get("referenced_message") in ["None", None]
-                            else message.get("referenced_message", {}).get(
-                                "content", ""
-                            )
-                        ),
-                        referenced_message_author_id=(
-                            ""
-                            if message.get("referenced_message") in ["None", None]
-                            else message.get("referenced_message", {})
-                            .get("author", {})
-                            .get("id", "")
-                        ),
-                    )
-                    received_messages.append(message_data)
-                except Exception as e:
-                    continue
-
-            return received_messages
+                return received_messages
 
         except Exception as e:
-            logger.error(
-                f"{self.account.index} | Error in _get_last_chat_messages: {e}"
-            )
+            logger.error(f"{self.account.index} | Error in _get_last_chat_messages: {e}")
             return []
 
     async def _gpt_referenced_messages(
@@ -410,7 +427,7 @@ class DiscordChatter:
         try:
             api_key = random.choice(self.config.DEEPSEEK.API_KEYS)
             user_message = f"消息1: {referenced_message_content}\n消息2: {main_message_content}"
-            
+
             success, response = await ask_deepseek(
                 api_key=api_key,
                 model=self.config.DEEPSEEK.MODEL,
@@ -418,12 +435,12 @@ class DiscordChatter:
                 prompt=DEEPSEEK_REFERENCED_MESSAGES_SYSTEM_PROMPT,
                 proxy=self.config.DEEPSEEK.PROXY_FOR_DEEPSEEK,
             )
-            
+
             if not success:
                 logger.warning(f"{self.account.index} | DeepSeek API失败，切换到ChatGPT: {response}")
                 return
                 # return await self._gpt_referenced_messages(main_message_content, referenced_message_content)
-                
+
             return response
         except Exception as e:
             logger.warning(f"{self.account.index} | DeepSeek错误，切换到ChatGPT: {str(e)}")
@@ -459,7 +476,7 @@ class DiscordChatter:
         """使用DeepSeek基于聊天历史生成新消息，如果失败则使用ChatGPT"""
         try:
             api_key = random.choice(self.config.DEEPSEEK.API_KEYS)
-            
+
             success, response = await ask_deepseek(
                 api_key=api_key,
                 model=self.config.DEEPSEEK.MODEL,
@@ -467,14 +484,14 @@ class DiscordChatter:
                 prompt=DEEPSEEK_BATCH_MESSAGES_SYSTEM_PROMPT,
                 proxy=self.config.DEEPSEEK.PROXY_FOR_DEEPSEEK,
             )
-            
+
             if not success:
                 logger.warning(f"{self.account.index} | DeepSeek API失败，切换到ChatGPT: {response}")
                 return
                 # return await self._gpt_batch_messages(messages_contents)
-                
+
             return response
         except Exception as e:
             logger.warning(f"{self.account.index} | DeepSeek错误，切换到ChatGPT: {str(e)}")
-            return 
+            return
             # return await self._gpt_batch_messages(messages_contents)

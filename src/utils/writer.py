@@ -29,7 +29,9 @@ async def update_account(token: str, field: str, value: str) -> bool:
         "NEW_PASSWORD": 5, 
         "NEW_NAME": 6, 
         "NEW_USERNAME": 7, 
-        "NEW_PROFILE_PICTURE": 8
+        "NEW_PROFILE_PICTURE": 8,
+        "EXCEL_GUILD_ID": 9,
+        "EXCEL_CHANNEL_ID": 10
     }
 
     if field not in field_mapping:
