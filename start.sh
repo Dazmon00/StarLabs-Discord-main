@@ -168,11 +168,8 @@ run_discord_tool() {
 
     
     echo "正在启动 StarLabs Discord Bot..."
-    echo "按 Ctrl+C 停止运行并返回主菜单..."
-    python3.11 main.py
-    deactivate
-    echo "Discord Bot 已停止运行。"
-    read -n 1 -s -r -p "按任意键返回主菜单..."
+    # 使用 exec 替换当前进程运行 main.py
+    exec "$DISCORD_DIR/venv/bin/python3.11" main.py
 }
 
 # 主菜单
