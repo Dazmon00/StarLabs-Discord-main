@@ -1,23 +1,25 @@
 #!/bin/bash
 
 # 定义变量
-SCRIPT_PATH="$pwd/start.sh"
-DISCORD_DIR="$pwd/StarLabs-Discord-main"
+SCRIPT_PATH="$HOME/start.sh"
+DISCORD_DIR="$HOME/StarLabs-Discord-main"
 REPO_URL="https://github.com/Dazmon00/StarLabs-Discord-main.git"
 SCRIPT_URL="https://raw.githubusercontent.com/Dazmon00/StarLabs-Discord-main/main/start.sh"
+OS=$(uname)
 
 # 检查操作系统并设置权限要求
 check_permissions() {
-    if [ "$(uname)" != "Darwin" ]; then
-        # Linux 系统，要求 root 权限
+    if [ "$OS" = "Linux" ]; then
+        echo "当前系统是 Linux"
         if [ "$(id -u)" != "0" ]; then
             echo "此脚本在Linux上需要以 root 用户权限运行。"
             echo "请使用 'sudo -i' 命令切换到 root 用户，或以 'sudo' 运行脚本。"
             exit 1
         fi
-    else
-        # macOS 系统，不要求 root 权限
+    elif [ "$OS" = "Darwin" ]; then # macOS 系统，不要求 root 权限
         echo "检测到macOS系统，无需root权限，继续执行..."
+    else
+        echo "未知操作系统: $OS"
     fi
 }
 
@@ -90,12 +92,12 @@ install_discord_tool() {
     echo "正在从 GitHub 克隆仓库..."
     git clone "$REPO_URL" "$DISCORD_DIR" || {
         echo "克隆失败，请检查网络连接或仓库地址 ($REPO_URL)。"
-        return 1
+        exit 1
     }
 
     cd "$DISCORD_DIR" || {
         echo "无法进入 $DISCORD_DIR 目录。"
-        return 1
+        exit 1
     }
 
     # 创建并激活虚拟环境
@@ -103,26 +105,26 @@ install_discord_tool() {
     python3.11 -m venv venv
     source "$DISCORD_DIR/venv/bin/activate" || {
         echo "无法激活虚拟环境。"
-        return 1
+        exit 1
     }
 
     # 安装依赖
     echo "正在安装所需的 Python 包..."
     [ ! -f requirements.txt ] && {
         echo "未找到 requirements.txt 文件，无法安装依赖。"
-        return 1
+        exit 1
     }
     pip install -r requirements.txt || {
         echo "安装 requirements.txt 失败。"
-        return 1
+        exit 1
     }
     pip install httpx || {
         echo "安装 httpx 失败。"
-        return 1
+        exit 1
     }
 
     echo "安装完成！请配置相关文件后运行脚本。"
-    read -n 1 -s -r -p "按任意键返回主菜单..."
+    exit 0
 }
 
 # 运行 Discord 工具
@@ -136,7 +138,7 @@ run_discord_tool() {
 
     cd "$DISCORD_DIR" || {
         echo "无法进入 $DISCORD_DIR 目录。"
-        return 1
+        exit 1
     }
 
     # 检查并创建虚拟环境
@@ -145,26 +147,27 @@ run_discord_tool() {
         python3.11 -m venv venv
         source venv/bin/activate || {
             echo "无法激活虚拟环境。"
-            return 1
+            exit 1
         }
         echo "正在安装依赖..."
         pip install -r requirements.txt || {
             echo "安装 requirements.txt 失败。"
-            return 1
+            exit 1
         }
         pip install httpx || {
             echo "安装 httpx 失败。"
-            return 1
+            exit 1
         }
     else
         echo "正在激活虚拟环境..."
-        source venv/bin/activate 
+        source venv/bin/activate || {
+            echo "无法激活虚拟环境。"
+            exit 1
+        }
     fi
 
     echo "正在启动 StarLabs Discord Bot..."
     python3.11 main.py
-    echo "Discord Bot 已停止运行。"
-    read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
 # 主菜单
