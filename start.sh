@@ -168,6 +168,8 @@ run_discord_tool() {
 
     echo "正在启动 StarLabs Discord Bot..."
     python3.11 main.py
+    deactivate
+    read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
 # 主菜单
