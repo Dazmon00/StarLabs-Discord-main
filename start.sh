@@ -98,28 +98,38 @@ install_discord_tool() {
         return 1
     }
 
-    # 创建并激活虚拟环境
-    echo "正在创建和激活虚拟环境..."
-    python3.11 -m venv venv
-    source "$DISCORD_DIR/venv/bin/activate" || {
-        echo "无法激活虚拟环境。"
+    # 创建虚拟环境
+    echo "正在创建虚拟环境..."
+    python3.11 -m venv venv || {
+        echo "创建虚拟环境失败。"
         return 1
     }
 
-    # 安装依赖
-    echo "正在安装所需的 Python 包..."
+    # 激活虚拟环境并安装依赖
+    echo "正在激活虚拟环境并安装依赖..."
+    if ! source "$DISCORD_DIR/venv/bin/activate"; then
+        echo "无法激活虚拟环境。"
+        return 1
+    fi
+
     [ ! -f requirements.txt ] && {
         echo "未找到 requirements.txt 文件，无法安装依赖。"
+        deactivate
         return 1
     }
     pip install -r requirements.txt || {
         echo "安装 requirements.txt 失败。"
+        deactivate
         return 1
     }
     pip install httpx || {
         echo "安装 httpx 失败。"
+        deactivate
         return 1
     }
+
+    # 退出虚拟环境
+    deactivate
 
     echo "安装完成！请配置相关文件后运行脚本。"
     read -n 1 -s -r -p "按任意键返回主菜单..."
@@ -142,23 +152,28 @@ run_discord_tool() {
     # 检查并创建虚拟环境
     if [ ! -d "venv" ]; then
         echo "未找到虚拟环境，正在创建..."
-        python3.11 -m venv venv
-        source venv/bin/activate || {
+        python3.11 -m venv venv || {
+            echo "创建虚拟环境失败。"
+            return 1
+        }
+        if ! source venv/bin/activate; then
             echo "无法激活虚拟环境。"
             return 1
         }
         echo "正在安装依赖..."
         pip install -r requirements.txt || {
             echo "安装 requirements.txt 失败。"
+            deactivate
             return 1
         }
         pip install httpx || {
             echo "安装 httpx 失败。"
+            deactivate
             return 1
         }
     else
         echo "正在激活虚拟环境..."
-        source venv/bin/activate || {
+        if ! source venv/bin/activate; then
             echo "无法激活虚拟环境。"
             return 1
         }
@@ -167,6 +182,7 @@ run_discord_tool() {
     echo "正在启动 StarLabs Discord Bot..."
     python3.11 main.py
     echo "Discord Bot 已停止运行。"
+    deactivate
     read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
