@@ -9,10 +9,6 @@ from src.utils.constants import ACCOUNTS_FILE, Account
 
 
 async def start():
-    async def launch_wrapper(account):
-        async with semaphore:
-            await account_flow(account, config)
-
     show_logo()
     show_dev_info()
     config = src.utils.get_config()
@@ -73,14 +69,20 @@ async def start():
     # 使用信号量限制并发
     semaphore = asyncio.Semaphore(value=threads)
 
-    # 并行运行所有账户
-    await asyncio.gather(*(launch_wrapper(account) for account in shuffled_accounts))
+    # 定义并行运行的 wrapper
+    async def launch_wrapper(account):
+        async with semaphore:  # 使用信号量限制并发
+            await account_flow(account, config)
+
+    # 并行启动所有账户的任务
+    tasks = [launch_wrapper(account) for account in shuffled_accounts]
+    await asyncio.gather(*tasks)
 
 
 async def account_flow(account: Account, config: src.utils.config.Config):
     while True:  # 每个账号独立循环
         try:
-            # 初始随机睡眠
+            # 初始随机睡眠（短暂，避免所有账号同时启动）
             pause = random.randint(
                 config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[0],
                 config.SETTINGS.RANDOM_INITIALIZATION_PAUSE[1],
@@ -132,18 +134,20 @@ async def wrapper(function, config: src.utils.config.Config, *args, **kwargs):
                     config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
                 )
                 logger.info(
-                    f"Sleeping for <yellow>{pause}</yellow> seconds before next attempt {attempt+1}/{attempts}..."
+                    f"[{function.__self__.account.index}] Sleeping for <yellow>{pause}</yellow> seconds "
+                    f"before next attempt {attempt+1}/{attempts}..."
                 )
                 await asyncio.sleep(pause)
         except Exception as e:
-            logger.error(f"Wrapper attempt {attempt+1}/{attempts} failed: {e}")
+            logger.error(f"[{function.__self__.account.index}] Wrapper attempt {attempt+1}/{attempts} failed: {e}")
             if attempt < attempts - 1:
                 pause = random.randint(
                     config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[0],
                     config.SETTINGS.PAUSE_BETWEEN_ATTEMPTS[1],
                 )
                 logger.info(
-                    f"Sleeping for <yellow>{pause}</yellow> seconds before next attempt..."
+                    f"[{function.__self__.account.index}] Sleeping for <yellow>{pause}</yellow> seconds "
+                    f"before next attempt..."
                 )
                 await asyncio.sleep(pause)
     return False  # 如果所有尝试都失败，返回 False
