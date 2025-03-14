@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 定义变量
-SCRIPT_PATH="$HOME/start.sh"
-DISCORD_DIR="$HOME/StarLabs-Discord-main"
+SCRIPT_PATH="$pwd/start.sh"
+DISCORD_DIR="$pwd/StarLabs-Discord-main"
 REPO_URL="https://github.com/Dazmon00/StarLabs-Discord-main.git"
 SCRIPT_URL="https://raw.githubusercontent.com/Dazmon00/StarLabs-Discord-main/main/start.sh"
 
