@@ -1,109 +1,109 @@
 SETTINGS:
-    # discord token use for press reaction task etc, for getting emojis info
+    # 用于按反应任务等的Discord令牌，用于获取表情信息
     DISCORD_TOKEN_FOR_PARSING: ""
-    # proxy for parsing. format: username:password@ip:port
+    # 用于解析的代理。格式：用户名:密码@IP:端口
     PROXY_FOR_PARSING: ""
 
-    # number of concurrent threads
-    THREADS: 1
+    # 并发线程数
+    THREADS: 2
 
-    # number of retries for ANY action
+    # 任何操作的重试次数
     ATTEMPTS: 5
 
-    # shuffle accounts in random order
+    # 将账户随机打乱顺序
     SHUFFLE_ACCOUNTS: true
- 
-    # account range.
-    # BY DEFAULT: [0, 0] - all accounts 
-    # [3, 5] - only 3 4 5 accounts
-    # [7, 7] - only 7 account
+
+    # 账户范围。
+    # 默认值：[0, 0] - 使用所有账户
+    # [3, 5] - 仅使用第3、4、5个账户
+    # [7, 7] - 仅使用第7个账户
     ACCOUNTS_RANGE: [0, 0]
 
-    # WORKS ONLY IF ACCOUNTS_RANGE IS [0, 0]
-    # exact accounts to use. 
-    # BY DEFAULT: [] - all accounts
-    # Example: [1, 4, 6] - bot will use only 1, 4 and 6 accounts
+    # 仅当 ACCOUNTS_RANGE 为 [0, 0] 时生效
+    # 指定要使用的具体账户。
+    # 默认值：[] - 使用所有账户
+    # 示例：[1, 4, 6] - 机器人将仅使用第1、4、6个账户
     EXACT_ACCOUNTS_TO_USE: []
 
-    # pause between attempts
+    # 重试之间的暂停时间（秒）
     PAUSE_BETWEEN_ATTEMPTS: [1, 2]
 
-    # pause in seconds between accounts
+    # 账户之间的暂停时间（秒）
     RANDOM_PAUSE_BETWEEN_ACCOUNTS: [1, 2]
 
-    # pause in seconds between actions
+    # 操作之间的暂停时间（秒）
     RANDOM_PAUSE_BETWEEN_ACTIONS: [1, 2]
 
-    # random pause before start of every account
-    # to make sure that all accounts will be started at different times
+    # 每个账户开始前的随机暂停时间（秒）
+    # 以确保所有账户在不同时间启动
     RANDOM_INITIALIZATION_PAUSE: [1, 2]
 
-    # use random profile pictures for change profile picture task
+    # 为更换头像任务使用随机头像
     RANDOM_PROFILE_PICTURES: true
 
 
 AI_CHATTER:
-    # discord server id where bot will send messages
+    # 机器人发送消息的Discord服务器ID
     GUILD_ID: ""
 
-    # discord channel id where bot will send messages
+    # 机器人发送消息的Discord频道ID
     CHANNEL_ID: ""
 
-    # if a bot is asked something, what is the probability that it will answer or ignore the question
+    # 当机器人被询问时，回答或忽略问题的概率（百分比）
     ANSWER_PERCENTAGE: 50
 
-    # How many percent of texts will be REPLY to other users' texts
-    # the rest of the sms will just be sent to the chat.
-    # if 0, the bot will answer to no one
-    # if 100, the bot will send only replies to other users' sms.
+    # 文本中有多少百分比会回复其他用户的消息
+    # 其余消息将直接发送到聊天中。
+    # 如果为0，机器人不会回复任何人
+    # 如果为100，机器人只会回复其他用户的消息。
     REPLY_PERCENTAGE: 50
 
-    # number of messages to send
+    # 每个账户要发送的消息数量
     MESSAGES_TO_SEND_PER_ACCOUNT: [3, 5]
 
-    # pause between messages
+    # 消息之间的暂停时间（秒）
     PAUSE_BETWEEN_MESSAGES: [3, 5]
 
-    # pause after getting response from chatgpt and before sending message to discord
+    # 从ChatGPT获取响应后到发送消息到Discord前的暂停时间（秒）
     PAUSE_BEFORE_MESSAGE: [1, 2]
-    
+
 
 MESSAGE_SENDER:
-    # discord server id where bot will send messages
+    # 机器人发送消息的Discord服务器ID
     GUILD_ID: ""
 
-    # discord channel id where bot will send messages
+    # 机器人发送消息的Discord频道ID
     CHANNEL_ID: ""
-    
-    # delete message instantly after sending
+
+    # 发送后立即删除消息
     DELETE_MESSAGE_INSTANTLY: false
 
-    # send messages randomly
+    # 随机发送消息
     SEND_MESSAGES_RANDOMLY: false
 
-    # number of messages to send FOR EACH ACCOUNT. SO EACH ACCOUNT WILL SEND THIS AMOUNT OF MESSAGES
+    # 每个账户要发送的消息数量。因此每个账户都会发送这个数量的消息
     NUMBER_OF_MESSAGES_TO_SEND: 3
 
-    # pause between messages
+    # 消息之间的暂停时间（秒）
     PAUSE_BETWEEN_MESSAGES: [1, 5]
 
 
 CHAT_GPT:
-    # list of api keys. bot will use random api key for every message.
+    # API密钥列表。机器人将为每条消息随机使用一个API密钥。
     API_KEYS: ["sk-proj-"]
-    # chatgpt model to use. https://platform.openai.com/docs/models
+    # 要使用的ChatGPT模型。参考：https://platform.openai.com/docs/models
     MODEL: "gpt-4o"
 
-    # in some countries you may need to use proxy to access chatgpt.
-    # by default it's empty. format: username:password@ip:port
+    # 在某些国家可能需要使用代理访问ChatGPT。
+    # 默认值为空。格式：用户名:密码@IP:端口
     PROXY_FOR_CHAT_GPT: ""
 
 DEEPSEEK:
-    # list of api keys. bot will use random api key for every message.
+    # API密钥列表。机器人将为每条消息随机使用一个API密钥。
     API_KEYS: ["sk-"]
-    # deepseek model to use
+    # 要使用的ChatGPT模型。参考：https://platform.openai.com/docs/models
     MODEL: "deepseek-chat"
 
-    # in some countries you may need to use proxy to access deepseek.
-    # by default it's empty. format: username:password@ip:port
+    # 在某些国家可能需要使用代理访问ChatGPT。
+    # 默认值为空。格式：用户名:密码@IP:端口
     PROXY_FOR_DEEPSEEK: ""
