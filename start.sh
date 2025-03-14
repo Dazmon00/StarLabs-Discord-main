@@ -166,12 +166,17 @@ run_discord_tool() {
         }
     fi
 
-    
-    echo "正在启动 StarLabs Discord Bot..."
-    echo "按 Ctrl+C 停止运行并返回主菜单..."
-    python3.11 main.py
-    deactivate
-    echo "Discord Bot 已停止运行。"
+    # 使用 tmux 创建一个新的会话并在其中运行 Python 脚本
+    tmux new-session -d -s Discord  # 创建新的 tmux 会话
+    tmux send-keys -t Discord "cd $DISCORD_DIR" C-m  # 切换到 Discord 目录
+    tmux send-keys -t Discord "source \"$DISCORD_DIR/venv/bin/activate\"" C-m  # 激活虚拟环境
+    tmux send-keys -t Discord "python3.11 main.py" C-m  # 运行 Python 脚本
+    tmux attach-session -t Discord  # 连接到会话
+
+    echo "使用 'tmux attach-session -t dawn' 命令来查看日志。"
+    echo "要退出 tmux 会话，请按 Ctrl+B 然后按 D。"
+
+    # 提示用户按任意键返回主菜单
     read -n 1 -s -r -p "按任意键返回主菜单..."
 }
 
