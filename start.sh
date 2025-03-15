@@ -18,8 +18,6 @@ check_permissions() {
         fi
     elif [ "$OS" = "Darwin" ]; then # macOS 系统，不要求 root 权限
         echo "检测到macOS系统，无需root权限，继续执行..."
-        SCRIPT_PATH="$PWD/start.sh"
-        DISCORD_DIR="$PWD/StarLabs-Discord-main"
     else
         echo "未知操作系统: $OS"
     fi
