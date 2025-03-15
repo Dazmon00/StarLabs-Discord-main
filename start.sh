@@ -69,6 +69,7 @@ install_python() {
 
 # 安装 Discord 工具
 install_discord_tool() {
+    check_permissions
     # 检查并安装 Python
     install_python
 
@@ -216,6 +217,4 @@ main_menu() {
 }
 
 # 主逻辑
-check_permissions
-# download_script  # 如果需要一键下载功能，取消注释此行
 main_menu
